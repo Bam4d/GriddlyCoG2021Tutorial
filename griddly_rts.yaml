@@ -1,0 +1,363 @@
+# https://griddly.readthedocs.io/en/latest/games/GriddlyRTS/index.html
+
+Version: "0.1"
+Environment:
+  Name: GriddlyRTS
+  Description: An RTS Game. There's aliens and stuff.
+  Observers:
+    Isometric:
+      TileSize: [ 32, 48 ]
+      BackgroundTile: images/griddlyrts/floor-1.png
+      IsoTileHeight: 16
+      IsoTileDepth: 4
+    Vector:
+      IncludePlayerId: true
+      IncludeVariables: true
+  Variables:
+    - Name: player_resources
+      InitialValue: 0
+      PerPlayer: true
+  Player:
+    Count: 2
+  Termination:
+    Lose:
+      - Conditions:
+          - eq: [ base:count, 0 ] # If the player has no bases
+        Reward: -10 # -10 for a loss
+        OpposingReward: 10 # as the agent didnt lose
+  Levels:
+    - |
+      M  M  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      M  M  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  A1 H1 .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  H1 .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  H2 .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  H2 A2 .  .
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  M  M
+      .  .  .  .  .  .  .  .  .  .  .  .  .  .  M  M
+    
+
+Actions:
+  - Name: spawn_worker
+    InputMapping:
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: base
+          Commands:
+            - spawn: worker
+            - set: [ is_busy, 0 ]
+        Dst:
+          Object: _empty
+
+      - Src:
+          Object: base
+        Dst:
+          Object: [ base, barracks, combat, worker, ranged, movable_wall ]
+          Commands:
+            # Try to spawn in another location on the next tick
+            - exec:
+                Action: spawn_worker
+                Delay: 1
+                Randomize: true
+  - Name: spawn_combat
+    InputMapping:
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: barracks
+          Commands:
+            - spawn: combat
+            - set: [ is_busy, 0 ]
+        Dst:
+          Object: _empty
+
+      - Src:
+          Object: barracks
+        Dst:
+          Object: [ base, barracks, combat, worker, ranged, movable_wall ]
+          Commands:
+            # Try to spawn in another location on the next tick
+            - exec:
+                Action: spawn_combat
+                Delay: 1
+                Randomize: true
+
+  - Name: construct_barracks
+    InputMapping:
+      Inputs:
+        1:
+          Description: Completes construction of a barracks
+          VectorToDest: [ 0, 0 ]
+      Internal: true
+    Behaviours:
+      - Src:
+          Object: barracks_disabled
+          Commands:
+            - set: [ is_busy, 0 ]
+            - change_to: barracks
+        Dst:
+          Object: barracks_disabled
+
+  # worker costs 5 resources to build, get a reward when a worker is built
+  - Name: build_worker
+    InputMapping:
+      Inputs:
+        1:
+          Description: Build
+          VectorToDest: [ 0, 0 ]
+    Behaviours:
+      - Src:
+          Object: base
+          Preconditions:
+            - gte: [ player_resources, 5 ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - set: [ is_busy, 1 ]
+            - sub: [ player_resources, 5 ]
+            - reward: 1
+              # Queue a build which will take 10 seconds
+            - exec:
+                Action: spawn_worker
+                Delay: 10
+                Randomize: true
+                Executor: action
+        Dst:
+          Object: base
+
+  - Name: build_combat
+    InputMapping:
+      Inputs:
+        1:
+          Description: Build
+          VectorToDest: [ 0, 0 ]
+    Behaviours:
+      - Src:
+          Object: barracks
+          Preconditions:
+            - gte: [ player_resources, 5 ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - set: [ is_busy, 1 ]
+            - sub: [ player_resources, 5 ]
+            - reward: 1
+            - exec:
+                Action: spawn_combat
+                Delay: 10
+                Randomize: true
+                Executor: action
+        Dst:
+          Object: barracks
+
+  - Name: build_barracks
+    Behaviours:
+      - Src:
+          Object: worker
+          Preconditions:
+            - gte: [ player_resources, 20 ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - sub: [ player_resources, 20 ]
+            - reward: 1
+            - spawn: barracks_disabled
+        Dst:
+          Object: _empty
+
+  - Name: gather
+    Behaviours:
+      - Src:
+          Object: worker
+          Preconditions:
+            - lt: [ resources, 5 ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - incr: resources
+            - reward: 1
+        Dst:
+          Object: minerals
+          Commands:
+            - decr: resources
+            - lt:
+                Arguments: [resources, 10]
+                Commands:
+                  - set_tile: 1
+            - lt:
+                Arguments: [ resources, 5 ]
+                Commands:
+                  - set_tile: 2
+            - eq:
+                Arguments: [ resources, 0 ]
+                Commands:
+                  - remove: true
+      - Src:
+          Object: worker
+          Preconditions:
+            - eq: [ is_busy, 0 ]
+            - gt: [ resources, 0 ]
+            - eq: [ src._playerId, dst._playerId ]
+          Commands:
+            - decr: resources
+            - reward: 1
+        Dst:
+          Object: base
+          Commands:
+            - incr: player_resources
+
+  - Name: move
+    Behaviours:
+      - Src:
+          Preconditions:
+            - eq: [ is_busy, 0 ]
+          Object: [ worker, combat, ranged ]
+          Commands:
+            - mov: _dest # mov will move the object, _dest is the destination location of the action
+        Dst:
+          Object: _empty
+
+      - Src:
+          Object: ranged
+          Commands:
+            - mov: _dest # mov will move the object, _dest is the destination location of the action
+        Dst:
+          Object: [ movable_wall, worker, combat ]
+          Commands:
+            - cascade: _dest # reapply the same action to the dest location of the action
+
+  #   Name: ranged_attack
+  - Name: attack
+    Behaviours:
+
+      - Src:
+          Object: worker
+          Preconditions:
+            - neq: [ src._playerId, dst._playerId ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - reward: 1
+        Dst:
+          Object: [ base, combat, worker, ranged ]
+          Commands:
+            - sub: [ health, 1 ]
+            - lte:
+                Arguments: [ health, 0 ]
+                Commands:
+                  - remove: true
+
+      - Src:
+          Object: combat
+          Preconditions:
+            - neq: [ src._playerId, dst._playerId ]
+            - eq: [ is_busy, 0 ]
+          Commands:
+            - reward: 1
+        Dst:
+          Object: [ base, combat, worker, ranged, barracks ]
+          Commands:
+            - sub: [ health, 5 ]
+            - lte:
+                Arguments: [ health, 0 ]
+                Commands:
+                  - remove: true
+
+Objects:
+  - Name: minerals
+    MapCharacter: M
+    Variables:
+      - Name: resources
+        InitialValue: 20
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/minerals-1-0.png
+        - Image: images/griddlyrts/minerals-1-1.png
+        - Image: images/griddlyrts/minerals-1-2.png
+
+  - Name: worker
+    MapCharacter: H
+    Variables:
+      - Name: resources
+        InitialValue: 0
+      - Name: health
+        InitialValue: 10
+      - Name: is_busy
+        InitialValue: 0
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/jelly-1.png
+
+  - Name: ranged
+    MapCharacter: r
+    Variables:
+      - Name: health
+        InitialValue: 20
+      - Name: is_busy
+        InitialValue: 0
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/queen-1.png
+
+  - Name: combat
+    MapCharacter: c
+    Variables:
+      - Name: health
+        InitialValue: 30
+      - Name: is_busy
+        InitialValue: 0
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/beast-1.png
+
+  - Name: fixed_wall
+    MapCharacter: W
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/wall-grey-1.png
+
+  - Name: movable_wall
+    MapCharacter: w
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/crate-1.png
+
+  - Name: base
+    MapCharacter: A
+    Variables:
+      - Name: health
+        InitialValue: 50
+      - Name: is_busy
+        InitialValue: 0
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/base-1.png
+
+  - Name: barracks_disabled
+    MapCharacter: b
+    InitialActions:
+      - Action: construct_barracks
+        Delay: 20
+    Variables:
+      - Name: health
+        InitialValue: 20
+      - Name: is_busy
+        InitialValue: 1
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/barracks-disabled-1.png
+
+  - Name: barracks
+    MapCharacter: B
+    Variables:
+      - Name: health
+        InitialValue: 40
+      - Name: is_busy
+        InitialValue: 0
+    Observers:
+      Isometric:
+        - Image: images/griddlyrts/barracks-1.png
