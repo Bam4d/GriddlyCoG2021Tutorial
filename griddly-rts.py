@@ -21,7 +21,7 @@ if __name__ == '__main__':
         for p in range(env.player_count):
             env.render(observer=p)  # Renders the environment from the perspective of a single player
 
-        env.render(observer='global')  # Renders the entire environment
+        rgb = env.render(observer='global')  # Renders the entire environment
 
         if done:
             env.reset()

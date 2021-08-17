@@ -6,10 +6,10 @@ Environment:
   Description: An RTS Game. There's aliens and stuff.
   Observers:
     Isometric:
-      TileSize: [ 32, 48 ]
+      TileSize: [ 64, 96 ]
       BackgroundTile: images/griddlyrts/floor-1.png
-      IsoTileHeight: 16
-      IsoTileDepth: 4
+      IsoTileHeight: 32
+      IsoTileDepth: 8
     Vector:
       IncludePlayerId: true
       IncludeVariables: true
@@ -27,22 +27,22 @@ Environment:
         OpposingReward: 10 # as the agent didnt lose
   Levels:
     - |
+      M  M  W  W  .  .  .  .  .  .  .  .  .  .  .  .
       M  M  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      M  M  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  A1 H1 .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  H1 .  .  .  .  .  .  .  .  .  .  .  .  .
+      W  .  A1 H1 .  .  .  .  .  .  .  .  .  .  .  .
+      W  .  H1 .  .  w  .  .  .  .  .  .  .  .  .  .
+      .  .  .  .  r1 w  .  .  .  .  .  .  .  .  .  .
+      .  .  .  w  w  .  .  .  .  .  .  .  .  .  .  .
       .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
       .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
       .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
       .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  .  H2 .  .
-      .  .  .  .  .  .  .  .  .  .  .  .  H2 A2 .  .
+      .  .  .  .  .  .  .  .  .  .  .  w  w  .  .  .
+      .  .  .  .  .  .  .  .  .  .  w  r2 .  .  .  .
+      .  .  .  .  .  .  .  .  .  .  w  .  .  H2 .  W
+      .  .  .  .  .  .  .  .  .  .  .  .  H2 A2 .  W
       .  .  .  .  .  .  .  .  .  .  .  .  .  .  M  M
-      .  .  .  .  .  .  .  .  .  .  .  .  .  .  M  M
+      .  .  .  .  .  .  .  .  .  .  .  .  W  W  M  M
     
 
 Actions:
@@ -213,6 +213,13 @@ Actions:
 
   - Name: move
     Behaviours:
+      - Src:
+          Object: movable_wall
+          Commands:
+            - mov: _dest # mov will move the object, _dest is the destination location of the action
+        Dst:
+          Object: _empty
+
       - Src:
           Preconditions:
             - eq: [ is_busy, 0 ]
