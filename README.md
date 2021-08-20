@@ -10,7 +10,7 @@ The best way to do that is to use a conda environment as described below
 ## First create a conda environment with python 3.8
 
 ```
-conda env create --name griddly_tutorial python==3.8
+conda create --name griddly_tutorial python==3.8
 conda activate griddly_tutorial
 pip install -r requirments.txt
 ```
